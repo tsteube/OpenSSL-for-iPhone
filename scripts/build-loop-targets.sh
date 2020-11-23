@@ -26,6 +26,8 @@ do
     SDKVERSION="${TVOS_SDKVERSION}"
   elif [[ "${TARGET}" == "mac-catalyst"* ]]; then
     SDKVERSION="${MACOSX_SDKVERSION}"
+  elif [[ "${TARGET}" == "darwin64"* ]]; then
+    SDKVERSION="${MACOSX_SDKVERSION}"
   else
     SDKVERSION="${IOS_SDKVERSION}"
   fi
@@ -45,6 +47,8 @@ do
     PLATFORM="AppleTVOS"
   elif [[ "${TARGET}" == "mac-catalyst-"* ]]; then
     PLATFORM="MacOSX"
+  elif [[ "${TARGET}" == "darwin64-"* ]]; then
+    PLATFORM="MacOSX"
   else
     PLATFORM="iPhoneOS"
   fi
@@ -57,6 +61,11 @@ do
   export CROSS_TOP="${DEVELOPER}/Platforms/${PLATFORM}.platform/Developer"
   export CROSS_SDK="${PLATFORM}${SDKVERSION}.sdk"
 
+echo -------------------
+echo $CROSS_COMPILE
+echo $CROSS_TOP
+echo $CROSS_SDK
+
   # Prepare TARGETDIR and SOURCEDIR
   prepare_target_source_dirs
 
@@ -65,6 +74,7 @@ do
   # setcontext() and makecontext() result in App Store rejections) and creation
   # of shared libraries (default since 1.1.0)
   LOCAL_CONFIG_OPTIONS="${TARGET} --prefix=${TARGETDIR} ${CONFIG_OPTIONS} no-async no-shared"
+  LOCAL_CONFIG_OPTIONS="${LOCAL_CONFIG_OPTIONS} -isysroot $CROSS_TOP/SDKs/$CROSS_SDK"
 
   # Only relevant for 64 bit builds
   if [[ "${CONFIG_ENABLE_EC_NISTP_64_GCC_128}" == "true" && "${ARCH}" == *64  ]]; then
