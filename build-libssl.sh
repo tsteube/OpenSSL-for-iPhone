@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 #  Automatic build script for libssl and libcrypto
 #  for iPhoneOS and iPhoneSimulator
@@ -58,6 +58,7 @@ echo_help()
   echo "     --deprecated                  Exclude no-deprecated configure option and build with deprecated methods"
   echo "     --targets=\"TARGET TARGET ...\" Space-separated list of build targets"
   echo "                                     Options: ${DEFAULTTARGETS} mac-catalyst-x86_64"
+  echo "     --prefix=INSTALL_PREFIX        OpenSSL installation directory to build (defaults to current directory)"
   echo
   echo "For custom configure options, set variable CONFIG_OPTIONS"
   echo "For custom cURL options, set variable CURL_OPTIONS"
@@ -85,7 +86,7 @@ spinner()
 prepare_target_source_dirs()
 {
   # Prepare target dir
-  TARGETDIR="${CURRENTPATH}/bin/${PLATFORM}${SDKVERSION}-${ARCH}.sdk"
+  TARGETDIR="${INSTALL_PREFIX}/bin/${PLATFORM}${SDKVERSION}-${ARCH}.sdk"
   mkdir -p "${TARGETDIR}"
   LOG="${TARGETDIR}/build-openssl-${VERSION}.log"
 
@@ -93,11 +94,10 @@ prepare_target_source_dirs()
   echo "  Logfile: ${LOG}"
 
   # Prepare source dir
-  SOURCEDIR="${CURRENTPATH}/src/${PLATFORM}-${ARCH}"
+  SOURCEDIR="${INSTALL_PREFIX}/src/${PLATFORM}-${ARCH}"
   mkdir -p "${SOURCEDIR}"
-  tar zxf "${CURRENTPATH}/${OPENSSL_ARCHIVE_FILE_NAME}" -C "${SOURCEDIR}"
-  cd "${SOURCEDIR}/${OPENSSL_ARCHIVE_BASE_NAME}"
-  chmod u+x ./Configure
+  tar zxf "${INSTALL_PREFIX}/${OPENSSL_ARCHIVE_FILE_NAME}" -C "${SOURCEDIR}"
+  chmod u+x "${SOURCEDIR}/${OPENSSL_ARCHIVE_BASE_NAME}/Configure"
 }
 
 # Check for error status
@@ -128,9 +128,9 @@ run_configure()
   echo "  Configure..."
   set +e
   if [ "${LOG_VERBOSE}" == "verbose" ]; then
-    ./Configure ${LOCAL_CONFIG_OPTIONS} no-tests | tee "${LOG}"
+    ( cd "${SOURCEDIR}/${OPENSSL_ARCHIVE_BASE_NAME}"; ./Configure ${LOCAL_CONFIG_OPTIONS} no-tests ) | tee "${LOG}"
   else
-    (./Configure ${LOCAL_CONFIG_OPTIONS} no-tests > "${LOG}" 2>&1) & spinner
+    ( cd "${SOURCEDIR}/${OPENSSL_ARCHIVE_BASE_NAME}"; ./Configure ${LOCAL_CONFIG_OPTIONS} no-tests ) > "${LOG}" 2>&1 & spinner
   fi
 
   # Check for error status
@@ -142,9 +142,9 @@ run_make()
 {
   echo "  Make (using ${BUILD_THREADS} thread(s))..."
   if [ "${LOG_VERBOSE}" == "verbose" ]; then
-    make -j "${BUILD_THREADS}" | tee -a "${LOG}"
+    (cd "${SOURCEDIR}/${OPENSSL_ARCHIVE_BASE_NAME}" && make -j "${BUILD_THREADS}" install_dev ) | tee -a "${LOG}"
   else
-    (make -j "${BUILD_THREADS}" >> "${LOG}" 2>&1) & spinner
+    (cd "${SOURCEDIR}/${OPENSSL_ARCHIVE_BASE_NAME}" && make -j "${BUILD_THREADS}" install_dev ) >> "${LOG}" 2>&1 & spinner
   fi
 
   # Check for error status
@@ -154,8 +154,8 @@ run_make()
 # Cleanup and bookkeeping at end of build loop
 finish_build_loop()
 {
-  # Return to ${CURRENTPATH} and remove source dir
-  cd "${CURRENTPATH}"
+  # Return to ${INSTALL_PREFIX} and remove source dir
+  cd "${INSTALL_PREFIX}"
   rm -r "${SOURCEDIR}"
 
   # Add references to library files to relevant arrays
@@ -175,7 +175,7 @@ finish_build_loop()
 
   # Copy opensslconf.h to bin directory and add to array
   OPENSSLCONF="opensslconf_${OPENSSLCONF_SUFFIX}.h"
-  cp "${TARGETDIR}/include/openssl/opensslconf.h" "${CURRENTPATH}/bin/${OPENSSLCONF}"
+  cp "${TARGETDIR}/include/openssl/opensslconf.h" "${INSTALL_PREFIX}/bin/${OPENSSLCONF}"
   OPENSSLCONF_ALL+=("${OPENSSLCONF}")
 
   # Keep reference to first build target for include file
@@ -256,6 +256,10 @@ case $i in
     VERSION="${i#*=}"
     shift
     ;;
+  --prefix=*)
+    INSTALL_PREFIX="${i#*=}"
+    shift
+    ;;
   *)
     echo "Unknown argument: ${i}"
     ;;
@@ -331,14 +335,18 @@ fi
 SCRIPTDIR=$(cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)
 
 # Write files relative to current location and validate directory
-CURRENTPATH=$(pwd)
-case "${CURRENTPATH}" in
+if [[ -z $INSTALL_PREFIX ]]; then
+  INSTALL_PREFIX=$(pwd)
+elif [[ $INSTALL_PREFIX != /* ]]; then
+  # use absolute path
+  INSTALL_PREFIX="$(pwd)/${INSTALL_PREFIX}"
+fi
+case "${INSTALL_PREFIX}" in
   *\ * )
     echo "Your path contains whitespaces, which is not supported by 'make install'."
     exit 1
   ;;
 esac
-cd "${CURRENTPATH}"
 
 # Validate Xcode Developer path
 DEVELOPER=$(xcode-select -print-path)
@@ -372,13 +380,13 @@ echo "  Number of make threads: ${BUILD_THREADS}"
 if [ -n "${CONFIG_OPTIONS}" ]; then
   echo "  Configure options: ${CONFIG_OPTIONS}"
 fi
-echo "  Build location: ${CURRENTPATH}"
+echo "  Build location: ${INSTALL_PREFIX}"
 echo
 
 # Download OpenSSL when not present
 OPENSSL_ARCHIVE_BASE_NAME="openssl-${VERSION}"
 OPENSSL_ARCHIVE_FILE_NAME="${OPENSSL_ARCHIVE_BASE_NAME}.tar.gz"
-if [ ! -e ${OPENSSL_ARCHIVE_FILE_NAME} ]; then
+if [ ! -e ${INSTALL_PREFIX}/${OPENSSL_ARCHIVE_FILE_NAME} ]; then
   echo "Downloading ${OPENSSL_ARCHIVE_FILE_NAME}..."
   OPENSSL_ARCHIVE_URL="https://www.openssl.org/source/${OPENSSL_ARCHIVE_FILE_NAME}"
 
@@ -403,7 +411,7 @@ if [ ! -e ${OPENSSL_ARCHIVE_FILE_NAME} ]; then
 
   # Archive was found, so proceed with download.
   # -O Use server-specified filename for download
-  curl ${CURL_OPTIONS} -O "${OPENSSL_ARCHIVE_URL}"
+  curl ${CURL_OPTIONS} -o ${INSTALL_PREFIX}/${OPENSSL_ARCHIVE_FILE_NAME} "${OPENSSL_ARCHIVE_URL}"
 
 else
   echo "Using ${OPENSSL_ARCHIVE_FILE_NAME}"
@@ -419,24 +427,24 @@ set -eo pipefail
 
 # Clean up target directories if requested and present
 if [ "${CLEANUP}" == "true" ]; then
-  if [ -d "${CURRENTPATH}/bin" ]; then
-    rm -r "${CURRENTPATH}/bin"
+  if [ -d "${INSTALL_PREFIX}/bin" ]; then
+    rm -r "${INSTALL_PREFIX}/bin"
   fi
-  if [ -d "${CURRENTPATH}/include/openssl" ]; then
-    rm -r "${CURRENTPATH}/include/openssl"
+  if [ -d "${INSTALL_PREFIX}/include/openssl" ]; then
+    rm -r "${INSTALL_PREFIX}/include/openssl"
   fi
-  if [ -d "${CURRENTPATH}/lib" ]; then
-    rm -r "${CURRENTPATH}/lib"
+  if [ -d "${INSTALL_PREFIX}/lib" ]; then
+    rm -r "${INSTALL_PREFIX}/lib"
   fi
-  if [ -d "${CURRENTPATH}/src" ]; then
-    rm -r "${CURRENTPATH}/src"
+  if [ -d "${INSTALL_PREFIX}/src" ]; then
+    rm -r "${INSTALL_PREFIX}/src"
   fi
 fi
 
 # (Re-)create target directories
-mkdir -p "${CURRENTPATH}/bin"
-mkdir -p "${CURRENTPATH}/lib"
-mkdir -p "${CURRENTPATH}/src"
+mkdir -p "${INSTALL_PREFIX}/bin"
+mkdir -p "${INSTALL_PREFIX}/lib"
+mkdir -p "${INSTALL_PREFIX}/src"
 
 # Init vars for library references
 INCLUDE_DIR=""
@@ -452,29 +460,29 @@ source "${SCRIPTDIR}/scripts/build-loop-targets.sh"
 # Build iOS library if selected for build
 if [ ${#LIBSSL_IOS[@]} -gt 0 ]; then
   echo "Build library for iOS..."
-  lipo -create ${LIBSSL_IOS[@]} -output "${CURRENTPATH}/lib/libssl.a"
-  lipo -create ${LIBCRYPTO_IOS[@]} -output "${CURRENTPATH}/lib/libcrypto.a"
+  lipo -create ${LIBSSL_IOS[@]} -output "${INSTALL_PREFIX}/lib/libssl.a"
+  lipo -create ${LIBCRYPTO_IOS[@]} -output "${INSTALL_PREFIX}/lib/libcrypto.a"
   echo "\n=====>iOS SSL and Crypto lib files:"
-  echo "${CURRENTPATH}/lib/libssl.a"
-  echo "${CURRENTPATH}/lib/libcrypto.a"
+  echo "${INSTALL_PREFIX}/lib/libssl.a"
+  echo "${INSTALL_PREFIX}/lib/libcrypto.a"
 fi
 
 # Build tvOS library if selected for build
 if [ ${#LIBSSL_TVOS[@]} -gt 0 ]; then
   echo "Build library for tvOS..."
-  lipo -create ${LIBSSL_TVOS[@]} -output "${CURRENTPATH}/lib/libssl-tvOS.a"
-  lipo -create ${LIBCRYPTO_TVOS[@]} -output "${CURRENTPATH}/lib/libcrypto-tvOS.a"
+  lipo -create ${LIBSSL_TVOS[@]} -output "${INSTALL_PREFIX}/lib/libssl-tvOS.a"
+  lipo -create ${LIBCRYPTO_TVOS[@]} -output "${INSTALL_PREFIX}/lib/libcrypto-tvOS.a"
   echo "\n=====>tvOS SSL and Crypto lib files:"
-  echo "${CURRENTPATH}/lib/libssl-tvOS.a"
-  echo "${CURRENTPATH}/lib/libcrypto-tvOS.a"
+  echo "${INSTALL_PREFIX}/lib/libssl-tvOS.a"
+  echo "${INSTALL_PREFIX}/lib/libcrypto-tvOS.a"
 fi
 
 # Copy include directory
-[ -d "${CURRENTPATH}/include/openssl" ] || mkdir -p "${CURRENTPATH}/include/openssl"
-cp -R "${INCLUDE_DIR}/" "${CURRENTPATH}/include/openssl"
+[ -d "${INSTALL_PREFIX}/include/openssl" ] || mkdir -p "${INSTALL_PREFIX}/include/openssl"
+cp -R "${INCLUDE_DIR}/" "${INSTALL_PREFIX}/include/openssl"
 
 echo "\n=====>Include directory:"
-echo "${CURRENTPATH}/include/"
+echo "${INSTALL_PREFIX}/include/"
 
 # Only create intermediate file when building for multiple targets
 # For a single target, opensslconf.h is still present in $INCLUDE_DIR (and has just been copied to the target include dir)
@@ -482,7 +490,7 @@ if [ ${#OPENSSLCONF_ALL[@]} -gt 1 ]; then
 
   # Prepare intermediate header file
   # This overwrites opensslconf.h that was copied from $INCLUDE_DIR
-  OPENSSLCONF_INTERMEDIATE="${CURRENTPATH}/include/openssl/opensslconf.h"
+  OPENSSLCONF_INTERMEDIATE="${INSTALL_PREFIX}/include/openssl/opensslconf.h"
   echo "#include <TargetConditionals.h>" > "${OPENSSLCONF_INTERMEDIATE}"
   #cp "${INCLUDE_DIR}/opensslconf-template.h" "${OPENSSLCONF_INTERMEDIATE}"
 
@@ -491,7 +499,7 @@ if [ ${#OPENSSLCONF_ALL[@]} -gt 1 ]; then
   for OPENSSLCONF_CURRENT in "${OPENSSLCONF_ALL[@]}" ; do
 
     # Copy specific opensslconf file to include dir
-    cp "${CURRENTPATH}/bin/${OPENSSLCONF_CURRENT}" "${CURRENTPATH}/include/openssl"
+    cp "${INSTALL_PREFIX}/bin/${OPENSSLCONF_CURRENT}" "${INSTALL_PREFIX}/include/openssl"
 
     # Determine define condition
     case "${OPENSSLCONF_CURRENT}" in

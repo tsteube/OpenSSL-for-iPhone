@@ -61,11 +61,6 @@ do
   export CROSS_TOP="${DEVELOPER}/Platforms/${PLATFORM}.platform/Developer"
   export CROSS_SDK="${PLATFORM}${SDKVERSION}.sdk"
 
-echo -------------------
-echo $CROSS_COMPILE
-echo $CROSS_TOP
-echo $CROSS_SDK
-
   # Prepare TARGETDIR and SOURCEDIR
   prepare_target_source_dirs
 
@@ -88,12 +83,12 @@ echo $CROSS_SDK
   run_make
 
   # Run make install
-  set -e
-  if [ "${LOG_VERBOSE}" == "verbose" ]; then
-    make install_dev | tee -a "${LOG}"
-  else
-    make install_dev >> "${LOG}" 2>&1
-  fi
+  #set -e
+  #if [ "${LOG_VERBOSE}" == "verbose" ]; then
+  #  make install_dev | tee -a "${LOG}"
+  #else
+  #  make install_dev >> "${LOG}" 2>&1
+  #fi
 
   # Remove source dir, add references to library files to relevant arrays
   # Keep reference to first build target for include file

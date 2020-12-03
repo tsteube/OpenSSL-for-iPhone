@@ -69,6 +69,7 @@
 		53572A56183AAFFE00B21832 /* FSOpenSSLTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FSOpenSSLTests.m; sourceTree = "<group>"; };
 		53572A58183AAFFE00B21832 /* OpenSSL-for-iOS_Tests-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "OpenSSL-for-iOS_Tests-Prefix.pch"; sourceTree = "<group>"; };
 		53A29DF8238EB10E0083CBF5 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		5DF5B29F256C674E000E1E8B /* build-loop-targets.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; name = "build-loop-targets.sh"; path = "scripts/build-loop-targets.sh"; sourceTree = "<group>"; };
 		D1E979D803ACC127411934DC /* FSOpenSSL.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FSOpenSSL.h; sourceTree = "<group>"; };
 		D1E97EE2A904D58DAE4231E2 /* FSOpenSSL.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = FSOpenSSL.m; sourceTree = "<group>"; };
 		FD5896FA1B2F1FAA00F3E5B5 /* build-libssl.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "build-libssl.sh"; sourceTree = "<group>"; };
@@ -206,6 +207,7 @@
 		FD5896FD1B2F1FFC00F3E5B5 /* Scripts */ = {
 			isa = PBXGroup;
 			children = (
+				5DF5B29F256C674E000E1E8B /* build-loop-targets.sh */,
 				FD5896FA1B2F1FAA00F3E5B5 /* build-libssl.sh */,
 				FD5896FB1B2F1FB800F3E5B5 /* create-openssl-framework.sh */,
 			);
