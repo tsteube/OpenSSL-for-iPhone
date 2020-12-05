@@ -55,7 +55,7 @@ ios.cross: ${RELEASE_IOS_DIR}/openssl.framework
 ios.clean:
 	rm -rf ${RELEASE_IOS_DIR}
 
-xcframework: mac sim cat ios.arm64
+xcframework: mac sim cat ios.arm64 xcframework.clean
 	xcodebuild -create-xcframework \
 	  -library ${RELEASE_OS_DIR}/lib/openssl.a -headers ${RELEASE_OS_DIR}/include/ \
 	  -library ${RELEASE_SIMULATOR_DIR}/lib/openssl.a -headers ${RELEASE_SIMULATOR_DIR}/include/ \
